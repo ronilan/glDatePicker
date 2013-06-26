@@ -47,6 +47,14 @@
 		// NOTE: If your target element is hidden, the calendar will be hidden as well.
 		showAlways: false,
 
+		// Set to true if you want the calendar to be visible at all times.
+		// NOTE: Does not care if your target element is hidden.   
+		showAlwaysAlways: false,
+
+		// Set to true if you want the calendar to resize with window.
+		// NOTE: listner still attached.   
+		resizeable: true,
+   
 		// Hide the calendar when a date is selected (only if showAlways is set to false).
 		hideOnClick: true,
 
@@ -168,6 +176,16 @@
 			el.val(date.toLocaleDateString());
 		}),
 
+		// Callback that will trigger when the user holds (long tap) a selectable date.
+		// Parameters that are passed to the callback:
+		//     el : The input element the date picker is bound to
+		//   cell : The cell on the calendar that triggered this event
+		//   date : The date associated with the cell
+		//   data : Special data associated with the cell (if available, otherwise, null)
+		onHold: (function(el, cell, date, data) {
+			el.val(date.toLocaleDateString());
+		}),
+	 
 		// Callback that will trigger when the user hovers over a selectable date.
 		// This callback receives the same set of parameters as onClick.
 		onHover: function(el, cell, date, data) {},
@@ -307,12 +325,13 @@
 				var monthNames = options.monthNames || [ 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December' ];
 
 				// Create cell width based on el size
+
 				var containerWidth = el.outerWidth();
 				var containerHeight = containerWidth;
 
 				// Create cell size based on container size
 				var getCellSize = function(_size, _count) {
-					return (_size / _count) + ((options.borderSize / _count) * (_count - 1));
+					return Math.floor( (_size / _count) + ((options.borderSize / _count) * (_count - 1)) );
 				};
 				var cellWidth = getCellSize(containerWidth, maxCol);
 				var cellHeight = getCellSize(containerHeight, maxRow + 2);
@@ -330,6 +349,7 @@
 						});
 
 					$('body').append(calendar);
+										
 				}
 				else {
 					if(!eval(calendar.data('is'))) {
@@ -342,8 +362,9 @@
 				}
 
 				// Hide calendar if the target element isn't visible
-				if(!el.is(':visible')) { calendar.hide(); }
-
+				if(!options.showAlwaysAlways){
+					if(!el.is(':visible')) { calendar.hide(); }
+				}
 				// Add core classes and remove calendar's children
 				calendar
 					.removeClass()
@@ -351,14 +372,18 @@
 					.children().remove();
 
 				// Bind to resize event to position calendar
+
 				var onResize = function() {
+                  if(options.resizeable){
 					var elPos = el.offset();
 					calendar.css(
 					{
 						top: (elPos.top + el.outerHeight() + options.calendarOffset.y) + 'px',
 						left: (elPos.left + options.calendarOffset.x) + 'px'
 					});
+                  }
 				};
+
 				$(window).resize(onResize);
 				onResize();
 
@@ -605,13 +630,12 @@
 								// Handle today or selected dates
 								if(firstDateMonth != cellDateVal.month) { cellClass += ' outday'; }
 								if(todayTime == cellDateTime) { cellClass = 'today'; cellZIndex += 50; }
-								if(options.selectedDate._time() == cellDateTime) { cellClass = 'selected'; cellZIndex += 51; }
 
 								// Handle special dates
 								if(options.specialDates) {
 									$.each(options.specialDates, function(i, v) {
 										var vDate = getRepeatDate(v, v.date);
-
+									
 										if(vDate.time == cellDateTime) {
 											cellClass = (v.cssClass || 'special');
 											cellZIndex += 52;
@@ -619,19 +643,17 @@
 										}
 									});
 								}
+								
+								if(options.selectedDate._time() == cellDateTime) {
+									cellClass = cellClass + ' selected';
+									cellZIndex += 1000;
+								}
+								if(options.holdSelectDate) {
+									cellClass = cellClass + ' hold-selected';
+								}
 
 								cell
-									.mousedown(function() { return false; })
-									.hover(function(e) {
-										e.stopPropagation();
-
-										// Get the data from this cell
-										var hoverData = $(this).data('data');
-
-										// Call callback
-										options.onHover(el, cell, hoverData.date, hoverData.data);
-									})
-									.click(function(e) {
+									.on('click', function(e) {
 										e.stopPropagation();
 
 										// Get the data from this cell
@@ -640,16 +662,66 @@
 										// Save date to selected and first
 										options.selectedDate = options.firstDate = clickedData.date;
 
+										// Call callback & resets options so thet render will get user action.
+										options = options.onClick(calendar, $(this), clickedData.date, clickedData.data);
+										
+										// release any "hold" previously set
+										options.holdSelectDate = null;
+
 										// Update calendar (and auto-hide if necessary)
 										self.render(function() {
 											if(!options.showAlways && options.hideOnClick) {
 												self.hide();
 											}
 										});
+																				
+									})
+									.on('touchstart', function(e) {
+//										e.stopPropagation();
+
+										// Get the data from this cell
+										var holdData = $(this).data('data');
+
+										// Save date to selected and first
+										options.selectedDate = options.firstDate = holdData.date;
+																				
+											$_this = $(this);
+
+											timer = setTimeout(function () {
+												
+												// if no "hold" data
+												if(!options.holdSelectDate){
+
+													options.holdSelectDate = options.selectedDate;
+													options = options.onHold(calendar, $_this, holdData.date, holdData.data);
+
+												} else {  // treat as click
+
+													options = options.onClick(calendar, $_this, holdData.date, holdData.data);
+													options.holdSelectDate = null;
+
+												}
+
+												self.render();
+
+											}, 750);
+								 
+									})
+									.on('touchend', function(e) {
+											window.clearTimeout(timer);
+									})    
+									.on('mousedown', function() { return false; })
+									.on('hover', function(e) {
+										e.stopPropagation();
+
+										// Get the data from this cell
+										var hoverData = $(this).data('data');
 
 										// Call callback
-										options.onClick(el, $(this), clickedData.date, clickedData.data);
-									});
+										options.onHover(el, cell, hoverData.date, hoverData.data);
+																				
+									})
+
 							}
 						}
 
