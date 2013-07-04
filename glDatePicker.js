@@ -51,8 +51,8 @@
 		// NOTE: Does not care if your target element is hidden.   
 		showAlwaysAlways: false,
 
-		// Set to true if you want the calendar to resize with window.
-		// NOTE: listner still attached.   
+		// Set to true if you want the calendar to be visible at all times.
+		// NOTE: Does not care if your target element is hidden.   
 		resizeable: true,
    
 		// Hide the calendar when a date is selected (only if showAlways is set to false).
@@ -229,10 +229,10 @@
 			}
 
 			// Show the plugin on focus
-			el
-				.addClass('gldp-el')
-				.bind('click', function(e) { self.show(e); })
-				.bind('focus', function(e) { self.show(e); });
+//			el
+//				.addClass('gldp-el')
+//				.bind('click', function(e) { self.show(e); })
+//				.bind('focus', function(e) { self.show(e); });
 
 			// If the user is defining the container and it exists, hide it on initial creation.
 			// The update function will handle showing if it's showAlways = true
@@ -384,8 +384,8 @@
                   }
 				};
 
-				$(window).resize(onResize);
-				onResize();
+//				$(window).resize(onResize);
+//				onResize();
 
 				// Create variables for cells
 				var cellCSS =
